@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= hero.name %> | Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        h1, h2, h3 { font-family: 'Playfair Display', serif; }
+        body { font-family: 'Lato', sans-serif; background: #fff; color: #111; }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <div class="max-w-6xl mx-auto border-t-8 border-black pt-12">
+        <header class="mb-24 flex flex-col md:flex-row justify-between items-end gap-12">
+            <div class="flex-1">
+                <h1 class="text-7xl md:text-9xl font-bold leading-none mb-8"><%= hero.name %></h1>
+                <p class="text-2xl font-bold uppercase tracking-tighter max-w-md"><%= hero.title %></p>
+                <% if (hero.location) { %>
+                    <p class="text-sm font-bold mt-4 opacity-40">LOC: <%= hero.location %></p>
+                <% } %>
+            </div>
+            <% if (hero.photo_url) { %>
+                <img src="<%= hero.photo_url %>" alt="<%= hero.name %>" class="w-64 h-64 grayscale contrast-125 object-cover border-4 border-black">
+            <% } %>
+        </header>
+
+        <% if (hero.objective) { %>
+        <div class="mb-24 border-y-2 border-black py-12">
+            <h2 class="text-2xl font-bold mb-6 uppercase tracking-widest">The Objective</h2>
+            <p class="text-4xl leading-tight font-bold italic"><%= hero.objective %></p>
+        </div>
+        <% } %>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-12 mb-24">
+            <div class="md:col-span-2">
+                <h2 class="text-4xl font-bold mb-8 italic">The Narrative</h2>
+                <p class="text-2xl leading-relaxed"><%= about.bio %></p>
+            </div>
+            <div class="border-l-2 border-black pl-8">
+                <h2 class="text-xl font-bold mb-8 uppercase tracking-widest">The Arsenal</h2>
+                <div class="space-y-8">
+                    <% if (skills.technical_skills && skills.technical_skills.length) { %>
+                        <div>
+                            <h4 class="font-bold mb-4 text-xs opacity-40 uppercase">Technical</h4>
+                            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                <% skills.technical_skills.forEach(s => { %>
+                                    <span class="font-bold text-sm"><%= s %></span>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% } %>
+                    <% if (skills.languages && skills.languages.length) { %>
+                        <div>
+                            <h4 class="font-bold mb-4 text-xs opacity-40 uppercase">Languages</h4>
+                            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                <% skills.languages.forEach(s => { %>
+                                    <span class="font-bold text-sm"><%= s %></span>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% } %>
+                    <% if (skills.frameworks && skills.frameworks.length) { %>
+                        <div>
+                            <h4 class="font-bold mb-4 text-xs opacity-40 uppercase">Frameworks</h4>
+                            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                <% skills.frameworks.forEach(s => { %>
+                                    <span class="font-bold text-sm"><%= s %></span>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% } %>
+                    <% if (skills.tools && skills.tools.length) { %>
+                        <div>
+                            <h4 class="font-bold mb-4 text-xs opacity-40 uppercase">Tools</h4>
+                            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                <% skills.tools.forEach(s => { %>
+                                    <span class="font-bold text-sm"><%= s %></span>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <section class="mb-24">
+            <h2 class="text-5xl font-bold mb-16 uppercase tracking-tighter border-b-4 border-black pb-4">The Portfolio</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-24">
+                <% projects.forEach(project => { %>
+                    <div class="group">
+                        <h3 class="text-4xl font-bold mb-6 group-hover:underline decoration-4"><%= project.name %></h3>
+                        <p class="text-xl opacity-70 mb-8 leading-relaxed"><%= project.description %></p>
+                        <% if (project.tech_stack) { %>
+                            <div class="flex flex-wrap gap-4 mb-8">
+                                <% project.tech_stack.forEach(tag => { %>
+                                    <span class="text-xs font-black uppercase"><%= tag %></span>
+                                <% }); %>
+                            </div>
+                        <% } %>
+                        <div class="flex gap-8 font-bold uppercase text-sm">
+                            <% if (project.github_url) { %>
+                                <a href="<%= project.github_url %>" class="border-b-2 border-black">Source_Code</a>
+                            <% } %>
+                            <% if (project.live_url) { %>
+                                <a href="<%= project.live_url %>" class="border-b-2 border-black">Live_Demo</a>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </section>
+
+        <% if (experience && experience.length) { %>
+        <section class="mb-24">
+            <h2 class="text-5xl font-bold mb-16 uppercase tracking-tighter border-b-4 border-black pb-4">The Experience</h2>
+            <div class="space-y-24">
+                <% experience.forEach(exp => { %>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+                        <div class="text-xl font-black uppercase"><%= exp.duration %></div>
+                        <div class="md:col-span-2">
+                            <h3 class="text-4xl font-bold mb-2"><%= exp.role %></h3>
+                            <p class="text-xl font-bold opacity-40 mb-8"><%= exp.company %></p>
+                            <ul class="space-y-6">
+                                <% exp.responsibilities.forEach(res => { %>
+                                    <li class="text-xl leading-relaxed flex gap-6">
+                                        <span class="font-black">/</span>
+                                        <span><%= res %></span>
+                                    </li>
+                                <% }); %>
+                            </ul>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </section>
+        <% } %>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-24 mb-24 border-t-4 border-black pt-16">
+            <% if (education && education.length) { %>
+            <div>
+                <h2 class="text-3xl font-bold mb-12 uppercase">The Education</h2>
+                <div class="space-y-12">
+                    <% education.forEach(edu => { %>
+                        <div>
+                            <h3 class="text-2xl font-bold"><%= edu.degree %></h3>
+                            <p class="text-xl opacity-60 mt-2"><%= edu.institution %> // <%= edu.year %></p>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (certifications && certifications.length) { %>
+            <div>
+                <h2 class="text-3xl font-bold mb-12 uppercase">The Credentials</h2>
+                <div class="space-y-12">
+                    <% certifications.forEach(cert => { %>
+                        <div>
+                            <h3 class="text-2xl font-bold"><%= cert.name %></h3>
+                            <p class="text-xl opacity-60 mt-2"><%= cert.issuer %> // <%= cert.year %></p>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+        </div>
+
+        <footer class="py-12 border-t-2 border-black flex justify-between items-center font-bold uppercase text-sm">
+            <div><%= hero.name %> © <%= new Date().getFullYear() %></div>
+            <div class="flex gap-8">
+                <% if (contact && contact.email) { %><a href="mailto:<%= contact.email %>">Email</a><% } %>
+                <% if (contact && contact.github) { %><a href="<%= contact.github %>">GitHub</a><% } %>
+                <% if (contact && contact.linkedin) { %><a href="<%= contact.linkedin %>">LinkedIn</a><% } %>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

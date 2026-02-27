@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FolioAI - Professional Portfolio Builder</title>
+    <style>
+      :root {
+        --loader-bg: #ffffff;
+        --loader-text: #1a1a1a;
+        --loader-accent: #2563eb;
+      }
+
+      html.dark {
+        --loader-bg: #0f172a;
+        --loader-text: #f1f5f9;
+        --loader-accent: #3b82f6;
+      }
+
+      #initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: var(--loader-bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+
+      #initial-loader.fade-out {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .loader-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(0, 0, 0, 0.05);
+        border-top-color: var(--loader-accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      html.dark .spinner {
+        border-color: rgba(255, 255, 255, 0.05);
+        border-top-color: var(--loader-accent);
+      }
+
+      .loader-text {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--loader-text);
+        letter-spacing: 0.025em;
+        min-height: 1.25rem;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .typing::after {
+        content: '|';
+        animation: blink 1s step-end infinite;
+        margin-left: 2px;
+        color: var(--loader-accent);
+      }
+
+      @keyframes blink {
+        from, to { opacity: 1; }
+        50% { opacity: 0; }
+      }
+    </style>
+    <script>
+      // Check for dark mode before render
+      if (localStorage.getItem('portfolio-theme') === 'dark' || 
+          (!localStorage.getItem('portfolio-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
+  </head>
+  <body>
+    <div id="initial-loader">
+      <div class="loader-content">
+        <div class="spinner"></div>
+        <div id="loader-status" class="loader-text typing"></div>
+      </div>
+    </div>
+    <script>
+      const statusElement = document.getElementById('loader-status');
+      const messages = [
+        "Loading Portfolio...",
+        "Preparing Experience...",
+        "Rendering Projects...",
+        "Finalizing FolioAI..."
+      ];
+      let currentMsgIndex = 0;
+      let charIndex = 0;
+      let isDeleting = false;
+      let typeSpeed = 100;
+
+      function type() {
+        const currentMsg = messages[currentMsgIndex];
+        
+        if (isDeleting) {
+          statusElement.textContent = currentMsg.substring(0, charIndex - 1);
+          charIndex--;
+          typeSpeed = 50;
+        } else {
+          statusElement.textContent = currentMsg.substring(0, charIndex + 1);
+          charIndex++;
+          typeSpeed = 100;
+        }
+
+        if (!isDeleting && charIndex === currentMsg.length) {
+          isDeleting = true;
+          typeSpeed = 2000; // Pause at end
+        } else if (isDeleting && charIndex === 0) {
+          isDeleting = false;
+          currentMsgIndex = (currentMsgIndex + 1) % messages.length;
+          typeSpeed = 500;
+        }
+
+        setTimeout(type, typeSpeed);
+      }
+
+      // Start typing animation
+      type();
+
+      // Remove loader when page is fully loaded
+      window.addEventListener('load', () => {
+        const loader = document.getElementById('initial-loader');
+        // Small delay to ensure smooth transition
+        setTimeout(() => {
+          loader.classList.add('fade-out');
+          // Remove from DOM after transition
+          setTimeout(() => {
+            loader.remove();
+          }, 600);
+        }, 800);
+      });
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

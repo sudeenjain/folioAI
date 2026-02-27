@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= hero.name %> | Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Raleway', sans-serif; background: #1a1a2e; color: #fff; }
+        section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 4rem; }
+    </style>
+</head>
+<body>
+    <section class="text-center">
+        <% if (hero.photo_url) { %>
+            <img src="<%= hero.photo_url %>" alt="<%= hero.name %>" class="w-48 h-48 rounded-full mx-auto mb-12 border-4 border-white/10 object-cover">
+        <% } %>
+        <h1 class="text-7xl md:text-9xl font-bold mb-6"><%= hero.name %></h1>
+        <p class="text-2xl opacity-60 mb-4"><%= hero.title %></p>
+        <% if (hero.location) { %>
+            <p class="text-sm opacity-40 uppercase tracking-[0.3em]"><%= hero.location %></p>
+        <% } %>
+    </section>
+
+    <% if (hero.objective) { %>
+    <section class="bg-[#16213e] text-center">
+        <h2 class="text-4xl font-bold mb-12 opacity-30">The Mission</h2>
+        <p class="text-3xl leading-relaxed max-w-4xl mx-auto italic opacity-80"><%= hero.objective %></p>
+    </section>
+    <% } %>
+
+    <section class="bg-[#1a1a2e]">
+        <h2 class="text-4xl font-bold mb-12 opacity-30">The Story</h2>
+        <p class="text-3xl leading-relaxed max-w-4xl mx-auto"><%= about.bio %></p>
+    </section>
+
+    <section class="bg-[#1a1a2e]">
+        <h2 class="text-4xl font-bold mb-12 opacity-30">The Arsenal</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 max-w-6xl mx-auto">
+            <% if (skills.technical_skills && skills.technical_skills.length) { %>
+            <div>
+                <h4 class="text-xs font-bold opacity-30 uppercase tracking-widest mb-6">Technical</h4>
+                <div class="flex flex-wrap gap-4">
+                    <% skills.technical_skills.forEach(s => { %>
+                        <span class="text-xl font-bold"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (skills.languages && skills.languages.length) { %>
+            <div>
+                <h4 class="text-xs font-bold opacity-30 uppercase tracking-widest mb-6">Languages</h4>
+                <div class="flex flex-wrap gap-4">
+                    <% skills.languages.forEach(s => { %>
+                        <span class="text-xl font-bold"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (skills.frameworks && skills.frameworks.length) { %>
+            <div>
+                <h4 class="text-xs font-bold opacity-30 uppercase tracking-widest mb-6">Frameworks</h4>
+                <div class="flex flex-wrap gap-4">
+                    <% skills.frameworks.forEach(s => { %>
+                        <span class="text-xl font-bold"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (skills.tools && skills.tools.length) { %>
+            <div>
+                <h4 class="text-xs font-bold opacity-30 uppercase tracking-widest mb-6">Tools</h4>
+                <div class="flex flex-wrap gap-4">
+                    <% skills.tools.forEach(s => { %>
+                        <span class="text-xl font-bold"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+        </div>
+    </section>
+
+    <section class="bg-[#16213e]">
+        <h2 class="text-4xl font-bold mb-12 opacity-30">The Work</h2>
+        <div class="space-y-32 max-w-5xl mx-auto">
+            <% projects.forEach(project => { %>
+                <div class="group">
+                    <h3 class="text-5xl md:text-7xl font-bold mb-8 group-hover:text-blue-400 transition-colors"><%= project.name %></h3>
+                    <p class="text-xl opacity-70 mb-8 leading-relaxed"><%= project.description %></p>
+                    <% if (project.tech_stack) { %>
+                        <div class="flex flex-wrap gap-4 mb-8">
+                            <% project.tech_stack.forEach(tag => { %>
+                                <span class="text-sm opacity-40 border border-white/20 px-3 py-1 rounded-full"><%= tag %></span>
+                            <% }); %>
+                        </div>
+                    <% } %>
+                    <div class="flex gap-8">
+                        <% if (project.github_url) { %>
+                            <a href="<%= project.github_url %>" class="text-lg font-bold border-b-2 border-white/20 hover:border-white transition-all">Repository</a>
+                        <% } %>
+                        <% if (project.live_url) { %>
+                            <a href="<%= project.live_url %>" class="text-lg font-bold border-b-2 border-white/20 hover:border-white transition-all">Live Demo</a>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    </section>
+
+    <% if (experience && experience.length) { %>
+    <section class="bg-[#1a1a2e]">
+        <h2 class="text-4xl font-bold mb-12 opacity-30">The Journey</h2>
+        <div class="space-y-24 max-w-5xl mx-auto">
+            <% experience.forEach(exp => { %>
+                <div>
+                    <div class="flex flex-col md:flex-row justify-between mb-8 gap-4">
+                        <h3 class="text-4xl font-bold"><%= exp.role %> <span class="opacity-20">@</span> <%= exp.company %></h3>
+                        <span class="text-xl opacity-40 font-light"><%= exp.duration %></span>
+                    </div>
+                    <ul class="space-y-6 max-w-3xl opacity-70">
+                        <% exp.responsibilities.forEach(res => { %>
+                            <li class="text-xl leading-relaxed flex gap-6">
+                                <span class="opacity-20">—</span>
+                                <span><%= res %></span>
+                            </li>
+                        <% }); %>
+                    </ul>
+                </div>
+            <% }); %>
+        </div>
+    </section>
+    <% } %>
+
+    <% if (education && education.length || certifications && certifications.length) { %>
+    <section class="bg-[#16213e] grid grid-cols-1 md:grid-cols-2 gap-24">
+        <% if (education && education.length) { %>
+        <div>
+            <h2 class="text-4xl font-bold mb-12 opacity-30">Education</h2>
+            <div class="space-y-12">
+                <% education.forEach(edu => { %>
+                    <div>
+                        <h3 class="text-2xl font-bold"><%= edu.degree %></h3>
+                        <p class="text-xl opacity-50 mt-2"><%= edu.institution %> / <%= edu.year %></p>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+        <% } %>
+        <% if (certifications && certifications.length) { %>
+        <div>
+            <h2 class="text-4xl font-bold mb-12 opacity-30">Certifications</h2>
+            <div class="space-y-12">
+                <% certifications.forEach(cert => { %>
+                    <div>
+                        <h3 class="text-2xl font-bold"><%= cert.name %></h3>
+                        <p class="text-xl opacity-50 mt-2"><%= cert.issuer %> (<%= cert.year %>)</p>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+        <% } %>
+    </section>
+    <% } %>
+
+    <section class="bg-[#1a1a2e] text-center">
+        <h2 class="text-4xl font-bold mb-12 opacity-30">The Connection</h2>
+        <% if (contact.email) { %><p class="text-3xl mb-12"><%= contact.email %></p><% } %>
+        <div class="flex justify-center gap-12">
+            <% if (contact.github) { %><a href="<%= contact.github %>" class="text-xl font-bold border-b-2 border-white/20 hover:border-white transition-all">GitHub</a><% } %>
+            <% if (contact.linkedin) { %><a href="<%= contact.linkedin %>" class="text-xl font-bold border-b-2 border-white/20 hover:border-white transition-all">LinkedIn</a><% } %>
+        </div>
+    </section>
+</body>
+</html>

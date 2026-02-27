@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= hero.name %> | Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); }
+    </style>
+</head>
+<body class="bg-white text-gray-900">
+    <header class="gradient-bg min-h-screen flex flex-col items-center justify-center text-white p-12 text-center">
+        <% if (hero.photo_url) { %>
+            <img src="<%= hero.photo_url %>" alt="<%= hero.name %>" class="w-48 h-48 rounded-full border-8 border-white/20 object-cover mb-8 shadow-2xl">
+        <% } %>
+        <h1 class="text-6xl md:text-9xl font-bold mb-6"><%= hero.name %></h1>
+        <p class="text-2xl md:text-4xl opacity-90"><%= hero.title %></p>
+        <p class="mt-8 text-xl max-w-2xl"><%= hero.tagline %></p>
+        <% if (hero.location) { %>
+            <p class="mt-4 text-sm opacity-70"><%= hero.location %></p>
+        <% } %>
+    </header>
+
+    <% if (hero.objective) { %>
+    <section class="py-24 px-6 max-w-6xl mx-auto text-center">
+        <h2 class="text-4xl font-bold mb-12">Objective</h2>
+        <p class="text-2xl leading-relaxed text-gray-500 italic"><%= hero.objective %></p>
+    </section>
+    <% } %>
+
+    <section class="py-24 px-6 max-w-6xl mx-auto">
+        <h2 class="text-4xl font-bold mb-12">About Me</h2>
+        <p class="text-2xl leading-relaxed text-gray-600"><%= about.bio %></p>
+    </section>
+
+    <section class="py-24 px-6 bg-gray-50">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-4xl font-bold mb-12">Projects</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <% projects.forEach(project => { %>
+                    <div class="bg-white p-8 rounded-3xl shadow-xl hover:scale-105 transition-transform">
+                        <h3 class="text-2xl font-bold mb-4"><%= project.name %></h3>
+                        <p class="text-gray-500 mb-6"><%= project.description %></p>
+                        <% if (project.tech_stack) { %>
+                            <div class="flex flex-wrap gap-2 mb-6">
+                                <% project.tech_stack.forEach(tag => { %>
+                                    <span class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full"><%= tag %></span>
+                                <% }); %>
+                            </div>
+                        <% } %>
+                        <div class="flex gap-4">
+                            <% if (project.github_url) { %>
+                                <a href="<%= project.github_url %>" class="inline-block px-6 py-2 bg-black text-white rounded-full font-bold text-sm">GitHub</a>
+                            <% } %>
+                            <% if (project.live_url) { %>
+                                <a href="<%= project.live_url %>" class="inline-block px-6 py-2 border-2 border-black text-black rounded-full font-bold text-sm">Live</a>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-24 px-6 max-w-6xl mx-auto">
+        <h2 class="text-4xl font-bold mb-12">Skills</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+            <% if (skills.technical_skills && skills.technical_skills.length) { %>
+            <div>
+                <h4 class="text-xl font-bold mb-6">Technical</h4>
+                <div class="flex flex-wrap gap-2">
+                    <% skills.technical_skills.forEach(s => { %>
+                        <span class="bg-gray-100 px-3 py-1 rounded-lg text-sm"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (skills.languages && skills.languages.length) { %>
+            <div>
+                <h4 class="text-xl font-bold mb-6">Languages</h4>
+                <div class="flex flex-wrap gap-2">
+                    <% skills.languages.forEach(s => { %>
+                        <span class="bg-gray-100 px-3 py-1 rounded-lg text-sm"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (skills.frameworks && skills.frameworks.length) { %>
+            <div>
+                <h4 class="text-xl font-bold mb-6">Frameworks</h4>
+                <div class="flex flex-wrap gap-2">
+                    <% skills.frameworks.forEach(s => { %>
+                        <span class="bg-gray-100 px-3 py-1 rounded-lg text-sm"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+            <% if (skills.tools && skills.tools.length) { %>
+            <div>
+                <h4 class="text-xl font-bold mb-6">Tools</h4>
+                <div class="flex flex-wrap gap-2">
+                    <% skills.tools.forEach(s => { %>
+                        <span class="bg-gray-100 px-3 py-1 rounded-lg text-sm"><%= s %></span>
+                    <% }); %>
+                </div>
+            </div>
+            <% } %>
+        </div>
+    </section>
+
+    <% if (experience && experience.length) { %>
+    <section class="py-24 px-6 bg-black text-white">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-4xl font-bold mb-12">Experience</h2>
+            <div class="space-y-16">
+                <% experience.forEach(exp => { %>
+                    <div class="relative pl-8 border-l-4 border-white/20">
+                        <div class="absolute -left-[14px] top-0 w-6 h-6 bg-white rounded-full"></div>
+                        <div class="flex flex-col md:flex-row justify-between mb-4">
+                            <h3 class="text-3xl font-bold"><%= exp.role %> @ <%= exp.company %></h3>
+                            <span class="text-xl opacity-60"><%= exp.duration %></span>
+                        </div>
+                        <ul class="space-y-3 max-w-3xl opacity-80">
+                            <% exp.responsibilities.forEach(res => { %>
+                                <li class="text-lg flex gap-4">
+                                    <span>•</span>
+                                    <span><%= res %></span>
+                                </li>
+                            <% }); %>
+                        </ul>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </section>
+    <% } %>
+
+    <% if (education && education.length || certifications && certifications.length) { %>
+    <section class="py-24 px-6 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-24">
+        <% if (education && education.length) { %>
+        <div>
+            <h2 class="text-4xl font-bold mb-12">Education</h2>
+            <div class="space-y-8">
+                <% education.forEach(edu => { %>
+                    <div>
+                        <h3 class="text-2xl font-bold"><%= edu.degree %></h3>
+                        <p class="text-xl text-gray-500"><%= edu.institution %> | <%= edu.year %></p>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+        <% } %>
+        <% if (certifications && certifications.length) { %>
+        <div>
+            <h2 class="text-4xl font-bold mb-12">Certifications</h2>
+            <div class="space-y-8">
+                <% certifications.forEach(cert => { %>
+                    <div>
+                        <h3 class="text-2xl font-bold"><%= cert.name %></h3>
+                        <p class="text-xl text-gray-500"><%= cert.issuer %> (<%= cert.year %>)</p>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+        <% } %>
+    </section>
+    <% } %>
+
+    <footer class="py-24 px-6 text-center border-t border-gray-100">
+        <h2 class="text-4xl font-bold mb-8">Let's Talk</h2>
+        <% if (contact.email) { %><a href="mailto:<%= contact.email %>" class="text-2xl font-bold underline mb-8 block"><%= contact.email %></a><% } %>
+        <div class="flex justify-center gap-8 font-bold uppercase tracking-widest text-sm">
+            <% if (contact.github) { %><a href="<%= contact.github %>" class="hover:opacity-50 transition-opacity">GitHub</a><% } %>
+            <% if (contact.linkedin) { %><a href="<%= contact.linkedin %>" class="hover:opacity-50 transition-opacity">LinkedIn</a><% } %>
+        </div>
+    </footer>
+</body>
+</html>
