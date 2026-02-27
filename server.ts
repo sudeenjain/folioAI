@@ -1,5 +1,6 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
+// Dynamic imports for heavy modules to improve serverless performance
+// import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import archiver from "archiver";
@@ -9,6 +10,8 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// For Vercel, paths should be relative to process.cwd()
+const projectRoot = process.cwd();
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -284,7 +287,8 @@ Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strin
 
 app.post("/api/portfolio/render", async (req, res) => {
   const { templateId, data } = req.body;
-  const templatePath = path.join(__dirname, "server", "templates", `${String(templateId).padStart(2, '0')}.ejs`);
+  // Use projectRoot for Vercel compatibility
+  const templatePath = path.join(projectRoot, "server", "templates", `${String(templateId).padStart(2, '0')}.ejs`);
   try {
     const html = await ejs.renderFile(templatePath, data) as string;
     res.setHeader("Content-Type", "text/html");
@@ -306,7 +310,7 @@ app.get("/api/portfolio/preview/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
   const session = sessions[sessionId];
   if (!session) return res.status(404).send("Session not found");
-  const templatePath = path.join(__dirname, "server", "templates", `${String(session.templateId).padStart(2, '0')}.ejs`);
+  const templatePath = path.join(projectRoot, "server", "templates", `${String(session.templateId).padStart(2, '0')}.ejs`);
   try {
     const html = await ejs.renderFile(templatePath, session.sectionData) as string;
     res.setHeader("Content-Type", "text/html");
@@ -320,7 +324,7 @@ app.get("/api/portfolio/download/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
   const session = sessions[sessionId];
   if (!session) return res.status(404).send("Session not found");
-  const templatePath = path.join(__dirname, "server", "templates", `${String(session.templateId).padStart(2, '0')}.ejs`);
+  const templatePath = path.join(projectRoot, "server", "templates", `${String(session.templateId).padStart(2, '0')}.ejs`);
   try {
     const html = await ejs.renderFile(templatePath, session.sectionData) as string;
     res.setHeader("Content-Type", "application/zip");
@@ -335,27 +339,39 @@ app.get("/api/portfolio/download/:sessionId", async (req, res) => {
 });
 
 async function startServer() {
+  if (process.env.VERCEL) {
+    console.log("Running in Vercel environment - Skipping local server listener");
+    return;
+  }
+
   if (process.env.NODE_ENV !== "production") {
     try {
+      console.log("Starting Vite dev server...");
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
       app.use(vite.middlewares);
     } catch (e) {
-      console.warn("Vite failed to initialize, continuing as API only");
+      console.warn("Vite failed to initialize, continuing as API only", e);
     }
-  } else if (process.env.VERCEL === undefined) {
+  } else {
     // Only serve static files locally in production mode, NOT on Vercel
-    const distPath = path.join(__dirname, "dist");
+    const distPath = path.join(projectRoot, "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  if (process.env.VERCEL === undefined) {
-    app.listen(PORT, "0.0.0.0", () => console.log(`Server running on http://localhost:${PORT}`));
-  }
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
-startServer();
+// Only call startServer if not being bundled by Vercel
+if (!process.env.VERCEL) {
+  startServer().catch(err => {
+    console.error("Failed to start local server:", err);
+  });
+}
 
 export default app;
