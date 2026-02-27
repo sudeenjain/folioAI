@@ -40,6 +40,27 @@ const getGemini = () => {
   return new GoogleGenerativeAI(apiKey);
 };
 
+// Helper for retrying AI calls on rate limits (429)
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, delay = 2000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const isRateLimit = error.message?.includes("429") || error.message?.includes("Too Many Requests") || error.status === 429;
+      if (isRateLimit && i < maxRetries) {
+        const waitTime = delay * Math.pow(2, i);
+        console.warn(`[AI] Rate limit hit. Retrying in ${waitTime}ms... (Attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 async function analyzeGithub(username: string) {
   const token = process.env.GITHUB_TOKEN;
   const headers: Record<string, string> = {
@@ -155,7 +176,7 @@ Resume Text: ${resumeText || 'Not provided'}`;
       systemInstruction,
     });
 
-    const response = await model.generateContent({
+    const response = await withRetry(() => model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
@@ -237,7 +258,7 @@ Resume Text: ${resumeText || 'Not provided'}`;
           required: ["hero", "about", "projects", "skills", "contact"]
         }
       }
-    });
+    }));
 
     const result = response.response;
     res.json(JSON.parse(result.text()));
@@ -263,7 +284,7 @@ Profile Data: ${JSON.stringify(simplifiedData)}
 Templates 1-4: Creative/Bold, 5-8: Minimal/Professional, 9-12: Technical/Data-driven.
 Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strings).`;
 
-    const response = await model.generateContent({
+    const response = await withRetry(() => model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
@@ -276,7 +297,7 @@ Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strin
           required: ["recommended", "reasons"]
         }
       }
-    });
+    }));
     const result = response.response;
     res.json(JSON.parse(result.text()));
   } catch (error: any) {
