@@ -6,6 +6,7 @@ import axios from "axios";
 import archiver from "archiver";
 import ejs from "ejs";
 import 'dotenv/config';
+import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +17,13 @@ app.use(express.json({ limit: '50mb' }));
 const PORT = 3000;
 
 const sessions: Record<string, any> = {};
+
+// Gemini Helper
+const getGemini = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set in environment variables");
+  return new GoogleGenAI({ apiKey });
+};
 
 async function analyzeGithub(username: string) {
   const token = process.env.GITHUB_TOKEN;
@@ -85,6 +93,160 @@ app.post("/api/github/analyze", async (req, res) => {
   }
 });
 
+// AI Endpoints
+app.post("/api/ai/generate-content", async (req, res) => {
+  const { githubData, linkedinData, resumeText } = req.body;
+  try {
+    const simplifiedGithub = githubData ? {
+      profile: githubData.profile,
+      top_repos: githubData.repos?.slice(0, 10).map((r: any) => ({
+        name: r.name,
+        description: r.description,
+        language: r.language,
+        topics: r.topics
+      }))
+    } : null;
+
+    const ai = getGemini();
+    const systemInstruction = "You are an expert career coach and portfolio builder. Your task is to transform raw GitHub and LinkedIn data into compelling, professional portfolio content. Focus on achievements, skills, and impact. Ensure the tone is professional yet engaging.";
+    const prompt = `Generate professional portfolio content based on the following data:
+GitHub Data: ${JSON.stringify(simplifiedGithub)}
+LinkedIn Data: ${JSON.stringify(linkedinData)}
+Resume Text: ${resumeText || 'Not provided'}
+
+Please provide a structured response including a hero section, about bio, key projects, skills categorization, experience highlights, education, and contact details.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            hero: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                title: { type: Type.STRING },
+                tagline: { type: Type.STRING },
+                photo_url: { type: Type.STRING },
+                location: { type: Type.STRING },
+                objective: { type: Type.STRING }
+              },
+              required: ["name", "title", "tagline"]
+            },
+            about: {
+              type: Type.OBJECT,
+              properties: { bio: { type: Type.STRING } },
+              required: ["bio"]
+            },
+            projects: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  tech_stack: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  github_url: { type: Type.STRING },
+                  live_url: { type: Type.STRING }
+                },
+                required: ["name", "description"]
+              }
+            },
+            skills: {
+              type: Type.OBJECT,
+              properties: {
+                technical_skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+                languages: { type: Type.ARRAY, items: { type: Type.STRING } },
+                frameworks: { type: Type.ARRAY, items: { type: Type.STRING } },
+                tools: { type: Type.ARRAY, items: { type: Type.STRING } }
+              }
+            },
+            experience: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  company: { type: Type.STRING },
+                  role: { type: Type.STRING },
+                  duration: { type: Type.STRING },
+                  responsibilities: { type: Type.ARRAY, items: { type: Type.STRING } }
+                }
+              }
+            },
+            education: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  institution: { type: Type.STRING },
+                  degree: { type: Type.STRING },
+                  year: { type: Type.STRING }
+                }
+              }
+            },
+            contact: {
+              type: Type.OBJECT,
+              properties: {
+                email: { type: Type.STRING },
+                github: { type: Type.STRING },
+                linkedin: { type: Type.STRING }
+              }
+            }
+          },
+          required: ["hero", "about", "projects", "skills", "contact"]
+        }
+      }
+    });
+
+    if (!response.text) throw new Error("Empty response from AI");
+    res.json(JSON.parse(response.text));
+  } catch (error: any) {
+    console.error("AI Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/ai/recommend-templates", async (req, res) => {
+  const { githubData, linkedinData } = req.body;
+  try {
+    const simplifiedData = {
+      github: githubData ? { profile: githubData.profile, repo_count: githubData.repos?.length } : null,
+      linkedin: linkedinData
+    };
+
+    const ai = getGemini();
+    const prompt = `Based on the following professional profile, recommend exactly 3 template IDs (from 1 to 12) that would best showcase this person's work. 
+Profile Data: ${JSON.stringify(simplifiedData)}
+Templates 1-4: Creative/Bold, 5-8: Minimal/Professional, 9-12: Technical/Data-driven.
+Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strings).`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            recommended: { type: Type.ARRAY, items: { type: Type.INTEGER } },
+            reasons: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["recommended", "reasons"]
+        }
+      }
+    });
+    if (!response.text) throw new Error("Empty response from AI");
+    res.json(JSON.parse(response.text));
+  } catch (error: any) {
+    console.error("AI Recommend Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/api/portfolio/render", async (req, res) => {
   const { templateId, data } = req.body;
   const templatePath = path.join(__dirname, "server", "templates", `${String(templateId).padStart(2, '0')}.ejs`);
@@ -139,19 +301,21 @@ app.get("/api/portfolio/download/:sessionId", async (req, res) => {
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
-    app.use(vite.middlewares);
-  } else {
-    // In production, express serves static files from dist
+    try {
+      const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn("Vite failed to initialize, continuing as API only");
+    }
+  } else if (process.env.VERCEL === undefined) {
+    // Only serve static files locally in production mode, NOT on Vercel
     const distPath = path.join(__dirname, "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      // For Vercel, we might need a different path or just let Vercel handle static files
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  // Only listen on a port if not running as a Vercel function
   if (process.env.VERCEL === undefined) {
     app.listen(PORT, "0.0.0.0", () => console.log(`Server running on http://localhost:${PORT}`));
   }

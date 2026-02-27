@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Github, Linkedin, ArrowRight, Layout, Download, Eye, X, Upload, FileText, Sun, Moon, Edit2, Check } from 'lucide-react';
 import { useStore } from './lib/store';
-import { analyzeGithub, generatePortfolio, renderPortfolio } from './lib/api';
-import { generatePortfolioContent } from './lib/gemini';
+import { analyzeGithub, generatePortfolio, renderPortfolio, generatePortfolioContent, recommendPortfolioTemplates } from './lib/api';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 

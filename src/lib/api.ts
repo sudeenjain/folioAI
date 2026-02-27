@@ -17,6 +17,42 @@ export async function analyzeGithub(username: string) {
   }
 }
 
+export async function generatePortfolioContent(githubData: any, linkedinData: any, resumeText?: string) {
+  try {
+    const response = await fetch('/api/ai/generate-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ githubData, linkedinData, resumeText }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Content generation failed');
+    }
+    return response.json();
+  } catch (error: any) {
+    console.error('Error in generatePortfolioContent:', error);
+    throw error;
+  }
+}
+
+export async function recommendPortfolioTemplates(githubData: any, linkedinData: any) {
+  try {
+    const response = await fetch('/api/ai/recommend-templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ githubData, linkedinData }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Template recommendation failed');
+    }
+    return response.json();
+  } catch (error: any) {
+    console.error('Error in recommendPortfolioTemplates:', error);
+    throw error;
+  }
+}
+
 export async function renderPortfolio(templateId: string, data: any) {
   const response = await fetch('/api/portfolio/render', {
     method: 'POST',
@@ -28,6 +64,7 @@ export async function renderPortfolio(templateId: string, data: any) {
   }
   return response.text();
 }
+
 export async function generatePortfolio(confirmedSections: any, templateId: string) {
   const response = await fetch('/api/portfolio/generate', {
     method: 'POST',
