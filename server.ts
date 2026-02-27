@@ -43,26 +43,37 @@ async function analyzeGithub(username: string) {
     'Accept': 'application/vnd.github.v3+json',
     'User-Agent': 'Portfolio-AI-App'
   };
-  // Reverting to 'token ' prefix as it's more universal for classic/fine-grained
-  if (token) headers['Authorization'] = `token ${token}`;
 
-  console.log(`Analyzing GitHub user: ${username} (Token present: ${!!token})`);
+  // Use Bearer for fine-grained tokens or fallback to token prefix
+  if (token) {
+    if (token.startsWith('github_pat_')) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      headers['Authorization'] = `token ${token}`;
+    }
+  }
+
+  console.log(`[GitHub] Analyzing user: ${username} (Token prefix: ${token ? (token.startsWith('github_pat_') ? 'Bearer' : 'token') : 'None'})`);
 
   try {
     const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(username.trim())}`, { headers });
+
     if (!userRes.ok) {
       const errorData = await userRes.json().catch(() => ({}));
+      console.error(`[GitHub] User API Error (${userRes.status}):`, errorData);
       throw new Error(`GitHub User API failed (${userRes.status}): ${errorData.message || userRes.statusText}`);
     }
     const userData = await userRes.json() as any;
 
     const reposRes = await fetch(`https://api.github.com/users/${encodeURIComponent(username.trim())}/repos?sort=updated&per_page=100`, { headers });
     if (!reposRes.ok) {
-      throw new Error(`GitHub Repos API failed with status ${reposRes.status}`);
+      const errorData = await reposRes.json().catch(() => ({}));
+      console.error(`[GitHub] Repos API Error (${reposRes.status}):`, errorData);
+      throw new Error(`GitHub Repos API failed (${reposRes.status}): ${errorData.message || reposRes.statusText}`);
     }
     const reposData = await reposRes.json() as any[];
 
-    console.log(`Successfully fetched data for ${username}. Repos: ${reposData.length}`);
+    console.log(`[GitHub] Successfully fetched data for ${username}. Repos: ${reposData.length}`);
 
     const repos = reposData.map((repo: any) => ({
       name: repo.name,
@@ -90,7 +101,7 @@ async function analyzeGithub(username: string) {
       repos
     };
   } catch (error: any) {
-    console.error("GitHub API Error:", error.message);
+    console.error("[GitHub] Analysis Error:", error.message);
     throw error;
   }
 }
@@ -102,9 +113,14 @@ app.post("/api/github/analyze", async (req, res) => {
     const data = await analyzeGithub(username);
     res.json(data);
   } catch (error: any) {
+    console.error("[Endpoint] GitHub Analyze Error:", error.message);
     res.status(500).json({
       error: error.message,
-      env: { hasToken: !!process.env.GITHUB_TOKEN }
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      env: {
+        hasGithubToken: !!process.env.GITHUB_TOKEN,
+        nodeVersion: process.version
+      }
     });
   }
 });
