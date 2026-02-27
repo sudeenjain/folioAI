@@ -2,11 +2,9 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import axios from "axios";
 import archiver from "archiver";
 import ejs from "ejs";
 import 'dotenv/config';
-import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,26 +16,55 @@ const PORT = 3000;
 
 const sessions: Record<string, any> = {};
 
-// Gemini Helper
-const getGemini = () => {
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    env: {
+      hasGemini: !!process.env.GEMINI_API_KEY,
+      hasGithub: !!process.env.GITHUB_TOKEN,
+      nodeEnv: process.env.NODE_ENV,
+      isVercel: !!process.env.VERCEL
+    }
+  });
+});
+
+// Gemini Helper (Dynamic Import)
+const getGemini = async () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set in environment variables");
+  const { GoogleGenAI } = await import("@google/genai");
   return new GoogleGenAI({ apiKey });
 };
 
 async function analyzeGithub(username: string) {
   const token = process.env.GITHUB_TOKEN;
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'Portfolio-AI-App'
+  };
+  // Reverting to 'token ' prefix as it's more universal for classic/fine-grained
+  if (token) headers['Authorization'] = `token ${token}`;
 
   console.log(`Analyzing GitHub user: ${username} (Token present: ${!!token})`);
 
   try {
-    const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username.trim())}`, { headers });
-    const reposRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username.trim())}/repos?sort=updated&per_page=100`, { headers });
+    const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(username.trim())}`, { headers });
+    if (!userRes.ok) {
+      const errorData = await userRes.json().catch(() => ({}));
+      throw new Error(`GitHub User API failed (${userRes.status}): ${errorData.message || userRes.statusText}`);
+    }
+    const userData = await userRes.json() as any;
 
-    console.log(`Successfully fetched data for ${username}. Repos: ${reposRes.data.length}`);
+    const reposRes = await fetch(`https://api.github.com/users/${encodeURIComponent(username.trim())}/repos?sort=updated&per_page=100`, { headers });
+    if (!reposRes.ok) {
+      throw new Error(`GitHub Repos API failed with status ${reposRes.status}`);
+    }
+    const reposData = await reposRes.json() as any[];
 
-    const repos = reposRes.data.map((repo: any) => ({
+    console.log(`Successfully fetched data for ${username}. Repos: ${reposData.length}`);
+
+    const repos = reposData.map((repo: any) => ({
       name: repo.name,
       description: repo.description,
       language: repo.language,
@@ -51,45 +78,34 @@ async function analyzeGithub(username: string) {
 
     return {
       profile: {
-        name: userRes.data.name || userRes.data.login,
-        bio: userRes.data.bio,
-        avatar_url: userRes.data.avatar_url,
-        location: userRes.data.location,
-        blog: userRes.data.blog,
-        company: userRes.data.company,
-        public_repos: userRes.data.public_repos,
-        followers: userRes.data.followers
+        name: userData.name || userData.login,
+        bio: userData.bio,
+        avatar_url: userData.avatar_url,
+        location: userData.location,
+        blog: userData.blog,
+        company: userData.company,
+        public_repos: userData.public_repos,
+        followers: userData.followers
       },
       repos
     };
   } catch (error: any) {
-    const status = error.response?.status;
-    const errorData = error.response?.data;
-    const rateLimitRemaining = error.response?.headers?.['x-ratelimit-remaining'];
-
-    console.error(`GitHub API Error [${status}]:`, errorData || error.message);
-    console.error(`Rate limit remaining: ${rateLimitRemaining}`);
-
-    if (status === 401 || status === 403) {
-      if (rateLimitRemaining === '0') {
-        throw new Error("GitHub API rate limit exceeded. Please try again later or provide a GITHUB_TOKEN.");
-      }
-      throw new Error(`GitHub API access denied (403/401). Check if your GITHUB_TOKEN is valid. Status: ${status}`);
-    }
-    if (status === 404) {
-      throw new Error(`GitHub user "${username}" not found.`);
-    }
-    throw new Error(`Failed to fetch GitHub data: ${errorData?.message || error.message}`);
+    console.error("GitHub API Error:", error.message);
+    throw error;
   }
 }
 
 app.post("/api/github/analyze", async (req, res) => {
   const { username } = req.body;
+  if (!username) return res.status(400).json({ error: "Username is required" });
   try {
     const data = await analyzeGithub(username);
     res.json(data);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: error.message,
+      env: { hasToken: !!process.env.GITHUB_TOKEN }
+    });
   }
 });
 
@@ -107,20 +123,23 @@ app.post("/api/ai/generate-content", async (req, res) => {
       }))
     } : null;
 
-    const ai = getGemini();
+    const ai = await getGemini();
+    const { Type } = await import("@google/genai");
+
     const systemInstruction = "You are an expert career coach and portfolio builder. Your task is to transform raw GitHub and LinkedIn data into compelling, professional portfolio content. Focus on achievements, skills, and impact. Ensure the tone is professional yet engaging.";
     const prompt = `Generate professional portfolio content based on the following data:
 GitHub Data: ${JSON.stringify(simplifiedGithub)}
 LinkedIn Data: ${JSON.stringify(linkedinData)}
-Resume Text: ${resumeText || 'Not provided'}
+Resume Text: ${resumeText || 'Not provided'}`;
 
-Please provide a structured response including a hero section, about bio, key projects, skills categorization, experience highlights, education, and contact details.`;
-
-    const response = await ai.models.generateContent({
+    const model = ai.getGenerativeModel({
       model: "gemini-1.5-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction,
+      systemInstruction,
+    });
+
+    const response = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -202,10 +221,49 @@ Please provide a structured response including a hero section, about bio, key pr
       }
     });
 
-    if (!response.text) throw new Error("Empty response from AI");
-    res.json(JSON.parse(response.text));
+    const result = response.response;
+    res.json(JSON.parse(result.text()));
   } catch (error: any) {
     console.error("AI Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/ai/recommend-templates", async (req, res) => {
+  const { githubData, linkedinData } = req.body;
+  try {
+    const simplifiedData = {
+      github: githubData ? { profile: githubData.profile, repo_count: githubData.repos?.length } : null,
+      linkedin: linkedinData
+    };
+
+    const ai = await getGemini();
+    const { Type } = await import("@google/genai");
+
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `Based on the following professional profile, recommend exactly 3 template IDs (from 1 to 12) that would best showcase this person's work. 
+Profile Data: ${JSON.stringify(simplifiedData)}
+Templates 1-4: Creative/Bold, 5-8: Minimal/Professional, 9-12: Technical/Data-driven.
+Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strings).`;
+
+    const response = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            recommended: { type: Type.ARRAY, items: { type: Type.INTEGER } },
+            reasons: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["recommended", "reasons"]
+        }
+      }
+    });
+    const result = response.response;
+    res.json(JSON.parse(result.text()));
+  } catch (error: any) {
+    console.error("AI Recommend Error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
