@@ -77,7 +77,7 @@ async function callAI(prompt: string, systemInstruction: string) {
         "Authorization": `Bearer ${xaiKey}`
       },
       body: JSON.stringify({
-        model: "grok-beta",
+        model: "grok-2-latest",
         messages: [
           { role: "system", content: systemInstruction },
           { role: "user", content: prompt }
