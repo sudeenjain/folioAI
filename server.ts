@@ -6,7 +6,8 @@ import { fileURLToPath } from "url";
 import archiver from "archiver";
 import ejs from "ejs";
 import 'dotenv/config';
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+// import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +17,7 @@ const projectRoot = process.cwd();
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
-const PORT = 3000;
+const PORT = 3001;
 
 const sessions: Record<string, any> = {};
 
@@ -26,6 +27,8 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
     env: {
       hasGemini: !!process.env.GEMINI_API_KEY,
+      hasXAI: !!process.env.XAI_API_KEY,
+      hasGroq: !!process.env.GROQ_API_KEY,
       hasGithub: !!process.env.GITHUB_TOKEN,
       nodeEnv: process.env.NODE_ENV,
       isVercel: !!process.env.VERCEL
@@ -33,12 +36,77 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Gemini Helper
-const getGemini = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set in environment variables");
-  return new GoogleGenerativeAI(apiKey);
-};
+// Groq Helper
+async function callAI(prompt: string, systemInstruction: string) {
+  // Prefer Groq, fallback to xAI if Groq isn't set
+  const groqKey = process.env.GROQ_API_KEY;
+  const xaiKey = process.env.XAI_API_KEY;
+  
+  if (groqKey) {
+    console.log("[AI] Using Groq Provider");
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${groqKey}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Groq API Error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json() as any;
+    return data.choices[0].message.content;
+  } else if (xaiKey) {
+    console.log("[AI] Using xAI Provider");
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${xaiKey}`
+      },
+      body: JSON.stringify({
+        model: "grok-beta",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`xAI API Error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json() as any;
+    return data.choices[0].message.content;
+  }
+  
+  throw new Error("No AI API keys configured (GROQ_API_KEY or XAI_API_KEY required)");
+}
+
+// Gemini Helper (Optional Fallback)
+// const getGemini = () => {
+
+//   const apiKey = process.env.GEMINI_API_KEY;
+//   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+//   return new GoogleGenerativeAI(apiKey);
+// };
+
 
 // Helper for retrying AI calls on rate limits (429)
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, delay = 2000): Promise<T> {
@@ -163,105 +231,27 @@ app.post("/api/ai/generate-content", async (req, res) => {
       }))
     } : null;
 
-    const ai = getGemini();
-
-    const systemInstruction = "You are an expert career coach and portfolio builder. Your task is to transform raw GitHub and LinkedIn data into compelling, professional portfolio content. Focus on achievements, skills, and impact. Ensure the tone is professional yet engaging.";
+    const systemInstruction = "You are an expert career coach and portfolio builder. Your task is to transform raw GitHub and LinkedIn data into compelling, professional portfolio content. Focus on achievements, skills, and impact. Return the response as a JSON object matching the requested structure.";
     const prompt = `Generate professional portfolio content based on the following data:
 GitHub Data: ${JSON.stringify(simplifiedGithub)}
 LinkedIn Data: ${JSON.stringify(linkedinData)}
-Resume Text: ${resumeText || 'Not provided'}`;
+Resume Text: ${resumeText || 'Not provided'}.
+    
+REQUIRED JSON STRUCTURE:
+{
+  "hero": { "name": "string", "title": "string", "tagline": "string", "photo_url": "string", "location": "string", "objective": "string" },
+  "about": { "bio": "string" },
+  "projects": [{ "name": "string", "description": "string", "tech_stack": ["string"], "github_url": "string", "live_url": "string" }],
+  "skills": { "technical_skills": ["string"], "languages": ["string"], "frameworks": ["string"], "tools": ["string"] },
+  "experience": [{ "company": "string", "role": "string", "duration": "string", "responsibilities": ["string"] }],
+  "education": [{ "institution": "string", "degree": "string", "year": "string" }],
+  "certifications": [{ "name": "string", "issuer": "string", "year": "string" }],
+  "contact": { "email": "string", "github": "string", "linkedin": "string" }
+} `;
 
-    const model = ai.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      systemInstruction,
-    });
+    const textResult = await withRetry(() => callAI(prompt, systemInstruction));
+    res.json(JSON.parse(textResult));
 
-    const response = await withRetry(() => model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            hero: {
-              type: SchemaType.OBJECT,
-              properties: {
-                name: { type: SchemaType.STRING },
-                title: { type: SchemaType.STRING },
-                tagline: { type: SchemaType.STRING },
-                photo_url: { type: SchemaType.STRING },
-                location: { type: SchemaType.STRING },
-                objective: { type: SchemaType.STRING }
-              },
-              required: ["name", "title", "tagline"]
-            },
-            about: {
-              type: SchemaType.OBJECT,
-              properties: { bio: { type: SchemaType.STRING } },
-              required: ["bio"]
-            },
-            projects: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  name: { type: SchemaType.STRING },
-                  description: { type: SchemaType.STRING },
-                  tech_stack: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                  github_url: { type: SchemaType.STRING },
-                  live_url: { type: SchemaType.STRING }
-                },
-                required: ["name", "description"]
-              }
-            },
-            skills: {
-              type: SchemaType.OBJECT,
-              properties: {
-                technical_skills: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                languages: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                frameworks: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                tools: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
-              }
-            },
-            experience: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  company: { type: SchemaType.STRING },
-                  role: { type: SchemaType.STRING },
-                  duration: { type: SchemaType.STRING },
-                  responsibilities: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
-                }
-              }
-            },
-            education: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  institution: { type: SchemaType.STRING },
-                  degree: { type: SchemaType.STRING },
-                  year: { type: SchemaType.STRING }
-                }
-              }
-            },
-            contact: {
-              type: SchemaType.OBJECT,
-              properties: {
-                email: { type: SchemaType.STRING },
-                github: { type: SchemaType.STRING },
-                linkedin: { type: SchemaType.STRING }
-              }
-            }
-          },
-          required: ["hero", "about", "projects", "skills", "contact"]
-        }
-      }
-    }));
-
-    const result = response.response;
-    res.json(JSON.parse(result.text()));
   } catch (error: any) {
     console.error("AI Error:", error.message);
     res.status(500).json({ error: error.message });
@@ -276,30 +266,19 @@ app.post("/api/ai/recommend-templates", async (req, res) => {
       linkedin: linkedinData
     };
 
-    const ai = getGemini();
-
-    const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const systemInstruction = "You are a design recommendation engine. Recommend templates based on user profile data.";
     const prompt = `Based on the following professional profile, recommend exactly 3 template IDs (from 1 to 12) that would best showcase this person's work.
 Profile Data: ${JSON.stringify(simplifiedData)}
 Templates 1-4: Creative/Bold, 5-8: Minimal/Professional, 9-12: Technical/Data-driven.
-Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strings).`;
+Provide JSON with:
+{
+  "recommended": [1, 2, 3],
+  "reasons": ["reason1", "reason2", "reason3"]
+}`;
 
-    const response = await withRetry(() => model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            recommended: { type: SchemaType.ARRAY, items: { type: SchemaType.INTEGER } },
-            reasons: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
-          },
-          required: ["recommended", "reasons"]
-        }
-      }
-    }));
-    const result = response.response;
-    res.json(JSON.parse(result.text()));
+    const textResult = await withRetry(() => callAI(prompt, systemInstruction));
+    res.json(JSON.parse(textResult));
+
   } catch (error: any) {
     console.error("AI Recommend Error:", error.message);
     res.status(500).json({ error: error.message });
@@ -308,15 +287,27 @@ Provide JSON with "recommended" (array of 3 IDs) and "reasons" (array of 3 strin
 
 app.post("/api/portfolio/render", async (req, res) => {
   const { templateId, data } = req.body;
-  // Use projectRoot for Vercel compatibility
   const templatePath = path.join(projectRoot, "server", "templates", `${String(templateId).padStart(2, '0')}.ejs`);
+  
+  // Safe defaults to prevent EJS "variable not defined" errors
+  const safeData = {
+    hero: { name: "", title: "", tagline: "", location: "", objective: "", photo_url: "", ...data?.hero },
+    about: { bio: "", ...data?.about },
+    projects: Array.isArray(data?.projects) ? data.projects : [],
+    skills: { technical_skills: [], languages: [], frameworks: [], tools: [], ...data?.skills },
+    experience: Array.isArray(data?.experience) ? data.experience : [],
+    education: Array.isArray(data?.education) ? data.education : [],
+    certifications: Array.isArray(data?.certifications) ? data.certifications : [],
+    contact: { email: "", github: "", linkedin: "", ...data?.contact }
+  };
+
   try {
-    const html = await ejs.renderFile(templatePath, data) as string;
+    const html = await ejs.renderFile(templatePath, safeData) as string;
     res.setHeader("Content-Type", "text/html");
     res.send(html);
   } catch (error: any) {
-    console.error("Render Error:", error);
-    res.status(500).send("Failed to render template");
+    console.error(`Render Error [Template ${templateId}]:`, error.message);
+    res.status(500).send(`Failed to render template: ${error.message}`);
   }
 });
 
@@ -332,12 +323,24 @@ app.get("/api/portfolio/preview/:sessionId", async (req, res) => {
   const session = sessions[sessionId];
   if (!session) return res.status(404).send("Session not found");
   const templatePath = path.join(projectRoot, "server", "templates", `${String(session.templateId).padStart(2, '0')}.ejs`);
+  
+  const safeData = {
+    hero: { name: "", title: "", tagline: "", location: "", objective: "", photo_url: "", ...session.sectionData?.hero },
+    about: { bio: "", ...session.sectionData?.about },
+    projects: Array.isArray(session.sectionData?.projects) ? session.sectionData.projects : [],
+    skills: { technical_skills: [], languages: [], frameworks: [], tools: [], ...session.sectionData?.skills },
+    experience: Array.isArray(session.sectionData?.experience) ? session.sectionData.experience : [],
+    education: Array.isArray(session.sectionData?.education) ? session.sectionData.education : [],
+    certifications: Array.isArray(session.sectionData?.certifications) ? session.sectionData.certifications : [],
+    contact: { email: "", github: "", linkedin: "", ...session.sectionData?.contact }
+  };
+
   try {
-    const html = await ejs.renderFile(templatePath, session.sectionData) as string;
+    const html = await ejs.renderFile(templatePath, safeData) as string;
     res.setHeader("Content-Type", "text/html");
     res.send(html);
   } catch (error: any) {
-    res.status(500).send("Failed to render template");
+    res.status(500).send(`Failed to render preview: ${error.message}`);
   }
 });
 
