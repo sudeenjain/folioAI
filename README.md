@@ -158,8 +158,6 @@ This project is open source. See the repository for license details.
 
 - **Live App:** [portfolio-ai-eta-dusky.vercel.app](https://portfolio-ai-eta-dusky.vercel.app/)
 - **GitHub:** [github.com/sudeenjain/folioAI](https://github.com/sudeenjain/folioAI)
-- **Google AI Studio:** [ai.studio/apps/246033e9-c8f3-4fec-933d-ed169351c3a9](https://ai.studio/apps/246033e9-c8f3-4fec-933d-ed169351c3a9)
-
 ---
 
 <p align="center">Made with ❤️ by <a href="https://github.com/sudeenjain">sudeenjain</a></p>
